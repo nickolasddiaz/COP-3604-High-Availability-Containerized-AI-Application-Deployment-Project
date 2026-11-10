@@ -23,7 +23,8 @@ The primary objective of this team-based project is to architect, implement, and
 
 ```bash
 COP-3604-High Availability Containerized AI Application Deployment Project/$ tree -F
-├── scripts/            # Folder for helper shell scripts  
+├── static/             # static files for flask, assets that are identical to every user
+├── tempates/           # generates dynamic HTML layout structures.
 ├── app.py              # Flask app
 ├── .gitignore          # ignore files from being commited
 ├── .env.example        # example of a .env without exposing real values
@@ -86,6 +87,18 @@ graph TD
     source .venv/bin/activate
     pip3 install -r requirements.txt
    ```
+
+2. **Run the Python app**
+
+  ```bash
+    python app.py
+  ```
+
+  Specify ip address and port
+  
+  ```bash
+    flask run --host=127.0.0.1 --port=5000
+  ```
 
 ## Contributers
 
