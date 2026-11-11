@@ -1,12 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unexpected Error</title>
-    <link rel="icon" type="image/png" href="/favicon.png">
-</head>
-<body>
-    <h1>Resource does not exist: 404</h1>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}404: AI Tutor{% endblock %}
+
+{% block content %}
+    <p>Resource does not exist: 404</p>
+{% endblock %}

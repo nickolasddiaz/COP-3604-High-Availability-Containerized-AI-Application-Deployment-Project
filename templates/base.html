@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='assets/favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <title>{% block title %}AI Tutor{% endblock %}</title>
+</head>
+<body>
+    <aside  class="sidebar">
+        <nav>
+            <h2 >Chat History</h2>
+            <ul>
+                {% for chat_id, chat_title in chat_history.items() %}
+                    <a href="/chat/{{chat_id}}">
+                        <!-- Title -->
+                        <li>{{ chat_title }}</li>
+                        <!-- Download Button -->
+                        <button type="button" onclick="event.preventDefault(); event.stopPropagation(); download_chat('{{ chat_id }}', '{{ chat_title }}');">&#8681;</button>
+                    </a>
+                {% else %}
+                    <li>Chat history is empty.</li>
+                {% endfor %}
+            </ul>
+        </nav>
+    </aside>
+
+    <header class="title-header">
+        <a href="/" >
+            <img src="{{ url_for('static', filename='assets/favicon.svg') }}" alt="AI Tutor home">
+        </a>
+        <h1>Hello I am an AI Tutor</h1>
+    </header>
+    <hr>
+
+    <main class="main-content">
+        {% block content %}
+        <!-- Child templates -->
+        {% endblock %}
+    </main>
+
+</body>
+</html>

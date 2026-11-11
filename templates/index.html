@@ -1,16 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <title>AI Tutor</title>
-</head>
-<body>
-    <h1>Hello I am a AI Tutor</h1>
-    <hr>
+{% extends "base.html" %}
+
+{% block title %}Welcome: AI Tutor{% endblock %}
+
+{% block content %}
     <br>
-    <p>I can help you pass your test.</p>
-    <p>{{test}}</p>
-</body>
-</html>
+    <br>
+    <div id="chat-bot">
+        <h2>Lets start chating it up.</h2>
+        {% for user, message in current_chat %}
+            <p>{{ user }}: {{ message }}</p>
+        {% endfor %}
+    </div>
+
+    <form id="message-form" action="/send/{{chat_id}}" method="POST">
+        <textarea id="message-input" name="message" rows="8" placeholder="Type a message..."></textarea>
+    </form>
+        <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+
+{% endblock %}
