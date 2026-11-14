@@ -21,15 +21,38 @@ The primary objective of this team-based project is to architect, implement, and
 
 ## File Structure
 
+Main Project
+
 ```bash
 COP-3604-High Availability Containerized AI Application Deployment Project/$ tree -F
-├── static/             # static files for flask, assets that are identical to every user
-├── tempates/           # generates dynamic HTML layout structures.
-├── app.py              # Flask app
-├── .gitignore          # ignore files from being commited
-├── .env.example        # example of a .env without exposing real values
-├── README.md           # Documentation about this project
-└── requirements.txt    # List of required python packages
+├── .vscode/settings.json   # Editor settings to hide cache file from the file explorer
+├── .gitignore              # ignore files from being commited
+├── .env.example            # Example of a .env without exposing real values
+└── README.md               # Documentation about this project
+```
+
+Python app files
+
+```bash
+COP-3604-High Availability Containerized AI Application Deployment Project/$ tree -F
+├── app/                    # Main Flask application package
+│   ├── blueprints/         # Route blueprints for app endpoints
+│   │   └── main.py         # Contains the main application routes and views
+│   ├── static/             # Static files served to the browser
+│   │   ├── assets/         # Image and media assets for the web app
+│   │   ├── css/            # Stylesheets for the UI
+│   │   └── js/             # Client-side JavaScript for interactivity
+│   └── templates/          # HTML templates for rendered pages
+│       ├── 404.html        # Custom 404 error page
+│       ├── base.html       # Shared HTML layout used across pages
+│       └── index.html      # Home page template
+├── config.py               # Application configuration settings
+├── pytest.ini              # Pytest configuration for test discovery
+├── requirements.txt        # Python dependencies for the app
+├── tests/                  # Automated test suite for the application
+│   ├── conftest.py         # Shared pytest fixtures and setup
+│   └── test_main.py        # Tests for the main application behavior
+└── wsgi.py                 # WSGI entrypoint for running the app in production
 ```
 
 ## Diagram
@@ -90,15 +113,23 @@ graph TD
 
 2. **Run the Python app**
 
-  ```bash
-    python app.py
-  ```
+    Run Development Mode
 
-  Specify ip address and port
-  
-  ```bash
-    flask run --host=127.0.0.1 --port=5000
-  ```
+    ```bash
+      python wsgi.py
+    ```
+
+    Run the tests with pytest
+
+    ```bash
+      pytest -v
+    ```
+
+    Run in production with Gunicorn (Linux only)
+
+    ```bash
+      gunicorn -w 4 -b 127.0.0.1:8000 wsgi:app
+    ```
 
 ## Contributers
 
@@ -184,7 +215,7 @@ Students, working in groups of 3-4, will deploy a multi-tiered application on GC
   - **Document every test run (required for both options):** the AI tool and prompt(s) used, the commands that were run, the date/time, the output, and a pass/fail result for each check. Commit the test logs to GitHub (e.g., tests/results/).
   - Each test must state its pass/fail criteria. Load tests must compare measured results against thresholds the team defines and justifies.
   - **Smoke test:** the front end is reachable through the load balancer, the AI tier is healthy, a question with a known answer from the team's documents returns that fact and cites a source, and the inference and database ports are blocked from the internet.
-  - **Front-end load test:**use Apache Bench (ab), e.g., ab -n 5000 -c 50 http:// LBIP/. Pass if there are no failed requests, all web containers served traffic (e.g., container hostname in a response header or logs), and automatic scaling up to 6 containers occurred.
+  - **Front-end load test:** use Apache Bench (ab), e.g., ab -n 5000 -c 50 http:// LBIP/. Pass if there are no failed requests, all web containers served traffic (e.g., container hostname in a response header or logs), and automatic scaling up to 6 containers occurred.
   - **AI load test:** send concurrent requests to the AI endpoint at 1, 5, and 10 concurrent users (e.g., ab -p with a JSON body, hey, k6, or locust). Record latency (p50/p95), tokens per second, and error rate; chart the results and identify the bottleneck.
   - **AI failover:** stop or kill one inference container (and/or VM) during active requests. Pass if requests keep succeeding through the remaining replica, the health check removes the failed replica, and it recovers automatically.
   - **Rate-limit test:** send a burst of requests to the AI endpoint. Pass if HTTP 429 responses are returned and the service remains healthy.
