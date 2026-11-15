@@ -11,7 +11,8 @@
     <aside  class="sidebar">
         <nav>
             <h2 >Chat History</h2>
-            <ul>
+            <h3><a href="/" class="chat"><p>New Chat</p></a></h3>
+            <ul id="chat-history-box">
                 {% for chat_id, chat_title in chat_history.items() %}
                     <a href="/chat/{{chat_id}}">
                         <!-- Title -->
@@ -19,9 +20,8 @@
                         <!-- Download Button -->
                         <button type="button" onclick="event.preventDefault(); event.stopPropagation(); download_chat('{{ chat_id }}', '{{ chat_title }}');">&#8681;</button>
                     </a>
-                {% else %}
-                    <li>Chat history is empty.</li>
                 {% endfor %}
+                <li class="empty-message">Chat history is empty.</li>
             </ul>
         </nav>
     </aside>

@@ -131,6 +131,22 @@ graph TD
       gunicorn -w 4 -b 127.0.0.1:8000 wsgi:app
     ```
 
+3. OpenAPI documentation using flasgger
+
+    [Markdown-Documentation](https://github.com/nickolasddiaz/COP-3604-High-Availability-Containerized-AI-Application-Deployment-Project/blob/main/api-reference.md)
+
+    Run the development mode and go to
+
+    ```bash
+      http://127.0.0.1:8001/apidocs/
+    ```
+
+    Download the openapi.json and convert it to markdown [openapi-to-markdown](https://markdownme.com/tools/openapi-to-markdown)
+
+    ```bash
+      curl http://localhost:8001/apispec_1.json -o openapi.json
+    ```
+
 ## Contributers
 
 - Andres Saldarriaga

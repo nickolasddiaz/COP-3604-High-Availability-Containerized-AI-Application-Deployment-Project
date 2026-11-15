@@ -1,6 +1,7 @@
 # personal project
 .vscode/
 .env
+openapi.json
 
 
 # from https://github.com/github/gitignore/blob/main/Python.gitignore

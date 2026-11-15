@@ -1,6 +1,7 @@
 import os
 import random
-from flask import Blueprint, render_template, request, send_from_directory
+from typing import Literal, TypedDict
+from flask import Blueprint, current_app, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 
@@ -8,103 +9,202 @@ main_bp = Blueprint('main', __name__)
 
 # Flask Tutorial: https://www.geeksforgeeks.org/python/flask-tutorial/
 
+class chats(TypedDict):
+    role: Literal['user', 'system']
+    content: str
+    files: list[str]
+
+type history = dict[int, str]
+
+chat_history: history = {
+    110:"Testing",
+    111:"Testing 22222222222222222222222222222222222222222",
+        }
+
 @main_bp.route('/')
 def welcome():
     """Render the landing page.
-
-    Returns:
-        The rendered "index.html" template
-        the chat history: dict[(chat_id) int, (chat_name) str]
-
+        ---
+        responses:
+            200:
+                description: Landing page with the empty new chat.
+                examples:
+                    text/html: '<html>Rendered index.html</html>'
     """
-    chat_history: dict[int, str] = {
-        110:"Testing",
-        111:"Testing 22222222222222222222222222222222222222222",        
-                }
+    # chat_history = get_chathistory(chat_id)
     return render_template("index.html", chat_history=chat_history, chat_id="new", current_chat={})
 
 @main_bp.errorhandler(404)
 def page_not_found(_error):
     """Render the custom 404 page when a route is not found.
+        ---
+        responses:
+            404:
+                description: The requested page was not found.
+                examples:
+                    text/html: '<html>Rendered 404.html</html>'
     """
-    return render_template('404.html', chat_history={}), 404
-
+    # chat_history = get_chathistory(chat_id)
+    return render_template('404.html', chat_history=chat_history), 404
 
 @main_bp.route("/send/new", methods=['POST'])
 def new_new_chat():
-    """Create a new chat session and return an AI generated response.
-
-    The request body must contain a form field named message (string).
-
-    Args:
-        request.form["message"] str: The user's message to be sent to
-            the AI model.
-
-    Returns:
-        dict[(chat_id) int, (chat_name) str]: A JSON payload containing:
-            - chat_id (int): A random identifier for the newly created chat.
-            - message (str): AI generated response string".
+    """Create a new chat and return a placeholder response.
+        ---
+        consumes:
+            - multipart/form-data
+        parameters:
+            - in: formData
+              name: message
+              type: string
+              required: true
+              description: Message to send.
+            - in: formData
+              name: uploaded_files
+              type: file
+              required: false
+              description: Optional file for context; repeat this field to upload multiple files.
+        responses:
+            200:
+                description: Placeholder response for a newly created chat.
+                schema:
+                    type: object
+                    properties:
+                        chat_id:
+                            type: integer
+                            example: 12345
+                        chat_name:
+                            type: string
+                            example: new chat name
+                        message:
+                            type: string
+                            example: Ai generated reponse Hello
     """
     message = request.form.get("message")
     return {"chat_id": random.randint(1, 0xFFFFFFFF),
+            "chat_name": "new chat name",
             "message": f"Ai generated reponse: {message}"
             }
 
 @main_bp.route("/send/<int:chat_id>", methods=['POST'])
 def send_chat(chat_id):
-    """Send a message for an existing chat and return the generated response.
-
-    Args:
-        chat_id (int): The identifier for the existing chat thread.
-        request.form["message"] str: The user's message to be sent.
-
-    Returns:
-        dict[str, str]: A JSON object with the generated AI response stored in
-        the message key.
+    """Send a message to an existing chat and return a placeholder response.
+        ---
+        consumes:
+            - multipart/form-data
+        parameters:
+            - in: path
+              name: chat_id
+              type: integer
+              required: true
+              description: Chat identifier.
+            - in: formData
+              name: message
+              type: string
+              required: true
+              description: Message to send.
+            - in: formData
+              name: uploaded_files
+              type: file
+              required: false
+              description: Optional file for context; repeat this field to upload multiple files.
+        responses:
+            200:
+                description: Placeholder response for the chat.
+                schema:
+                    type: object
+                    properties:
+                        message:
+                            type: string
+                            example: Ai generated reponse Hello
     """
     message = request.form.get("message")
     return {"message": f"Ai generated reponse: {message}"}
 
 @main_bp.route("/chat/<int:chat_id>", methods=['GET','POST'])
 def chat(chat_id):
-    """Display a chat thread or return the current transcript for a given chat.
-
-    For GET requests, this renders the chat page. For POST requests, it returns
-    the in-memory chat transcript for the requested conversation.
-
-    Args:
-        chat_id (int): The numeric identifier of the chat conversation to load.
-
-    Returns:
-        list[tuple[str, str]]: On GET, the rendered "index.html"
-        template with the chat history and current chat transcript. 
-        On POST, the current conversation transcript as a list of (role, message) tuples.
+    """Display a chat page or return its placeholder transcript.
+        ---
+        parameters:
+            - in: path
+              name: chat_id
+              type: integer
+              required: true
+              description: Chat identifier.
+        responses:
+            200:
+                description: For GET, the rendered chat page; for POST, the current placeholder transcript.
+                schema:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            role:
+                                type: string
+                                enum: [user, system]
+                            content:
+                                type: string
+                            files:
+                                type: array
+                                items:
+                                    type: string
+                examples:
+                    application/json:
+                        - role: user
+                            content Hello how are you.
+                            files [test1.txt, test2.txt]
+            405:
+                description: Method not allowed.
     """
-    current_chat = [
-        ("user", "Hello how are you."),
-        ("system", "I am doing great, do you have any questions."),
-        ("user", "pls let me pass on god."),
-        ("system", "you are beyond help."),
+
+    # example
+    current_chat: list[chats] = [
+        {'role': 'user', 'content': 'Hello how are you.', 'files': ["test1.txt", "test2.txt", "test3.txt"]},
+        {'role': 'system', 'content': 'I am doing great, do you have any questions.', 'files': []},
+        {'role': 'user', 'content': 'pls let me pass on god.', 'files': ["plshelp.pdf"]},
+        {'role': 'system', 'content': 'you are beyond help.', 'files': []},
     ]
 
     # Get return the rendered_template
     if request.method == 'POST':
         return current_chat
 
-    chat_history: dict[int, str] = {
-            110:"Testing",
-            111:"Testing 22222222222222222222222222222222222222222",        
-                    }
-    
-    return render_template("index.html", chat_history=chat_history, chat_id=chat_id, current_chat=current_chat)
+    # chat_history = get_chathistory(chat_id)
 
+    return render_template("index.html", chat_history=chat_history, chat_id=chat_id, current_chat=current_chat)
 
 @main_bp.route('/favicon.svg')
 # https://emojipedia.org/emoji-mashup/twitter/twemoji-14.0?a=%F0%9F%98%87&b=%F0%9F%A4%96
 # combination of 😇 🤖
 def favicon():
+    """Return the site's SVG favicon.
+        ---
+        produces:
+            - image/svg+xml
+        responses:
+            200:
+                description: SVG favicon.
+    """
     return send_from_directory(
-        os.path.join(main_bp.root_path, 'static', 'assets'),
+        os.path.join(current_app.static_folder, 'assets'), # type: ignore
         'favicon.svg',
+        mimetype='image/svg+xml'
+    )
+
+@main_bp.route('/file.svg')
+# https://flowbite.com/icons/
+# file-copy
+def filesvg():
+    """Return the file icon SVG.
+        ---
+        produces:
+            - image/svg+xml
+        responses:
+            200:
+                description: File icon SVG.
+    """
+    return send_from_directory(
+        os.path.join(current_app.static_folder, 'assets'), # type: ignore
+        'file.svg',
         mimetype='image/svg+xml'
     )
