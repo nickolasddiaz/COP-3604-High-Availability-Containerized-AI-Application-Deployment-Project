@@ -42,10 +42,12 @@ COP-3604-High Availability Containerized AI Application Deployment Project/$ tre
 │   │   ├── assets/         # Image and media assets for the web app
 │   │   ├── css/            # Stylesheets for the UI
 │   │   └── js/             # Client-side JavaScript for interactivity
-│   └── templates/          # HTML templates for rendered pages
-│       ├── 404.html        # Custom 404 error page
-│       ├── base.html       # Shared HTML layout used across pages
-│       └── index.html      # Home page template
+│   ├─── templates/         # HTML templates for rendered pages
+│   │    ├── 404.html       # Custom 404 error page
+│   │    ├── base.html      # Shared HTML layout used across pages
+│   │    └── index.html     # Home page template
+│   ├── ai_provider.py      # code to handle the Langchain LLM logic
+│   └── types.py            # Type definition file
 ├── config.py               # Application configuration settings
 ├── pytest.ini              # Pytest configuration for test discovery
 ├── requirements.txt        # Python dependencies for the app
@@ -109,6 +111,7 @@ graph TD
     python3 -m venv .venv
     source .venv/bin/activate
     pip3 install -r requirements.txt
+    cp .env.example .env # make sure to fill in the .env and don't leak it
    ```
 
 2. **Run the Python app**
@@ -131,7 +134,7 @@ graph TD
       gunicorn -w 4 -b 127.0.0.1:8000 wsgi:app
     ```
 
-3. OpenAPI documentation using flasgger
+3. **OpenAPI documentation using flasgger**
 
     [Markdown-Documentation](https://github.com/nickolasddiaz/COP-3604-High-Availability-Containerized-AI-Application-Deployment-Project/blob/main/api-reference.md)
 

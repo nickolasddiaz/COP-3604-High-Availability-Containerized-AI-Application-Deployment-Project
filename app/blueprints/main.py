@@ -1,20 +1,21 @@
 import os
 import random
-from typing import Literal, TypedDict
 from flask import Blueprint, current_app, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
+from app.ai_provider import AIProvider, get_ai_provider
+from app.types import history, chats
 
 
 main_bp = Blueprint('main', __name__)
 
+ai_provider: AIProvider
+
+@main_bp.record_once
+def on_load(state):
+    global ai_provider
+    ai_provider = get_ai_provider(state.app.config)
+
 # Flask Tutorial: https://www.geeksforgeeks.org/python/flask-tutorial/
-
-class chats(TypedDict):
-    role: Literal['user', 'system']
-    content: str
-    files: list[str]
-
-type history = dict[int, str]
 
 chat_history: history = {
     110:"Testing",
@@ -81,9 +82,16 @@ def new_new_chat():
                             example: Ai generated reponse Hello
     """
     message = request.form.get("message")
+    if not message:
+        return "message form is needed", 422
+    
+    chat_name: str = ai_provider.generateNameofChat(message)
+
+    response: str = ai_provider.askQuestion(message)
+
     return {"chat_id": random.randint(1, 0xFFFFFFFF),
-            "chat_name": "new chat name",
-            "message": f"Ai generated reponse: {message}"
+            "chat_name": chat_name,
+            "message": response
             }
 
 @main_bp.route("/send/<int:chat_id>", methods=['POST'])
