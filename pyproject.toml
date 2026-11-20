@@ -1,0 +1,27 @@
+[project]
+name = "cop-3604-ai-tutor"
+version = "1.0.0"
+description = "An AI-powered interactive tutor and adaptive assessment bot."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "Flask==3.1.3",
+    "flasgger==0.9.7.1",
+    "python-dotenv==1.2.4",
+    "langchain==1.5.0",
+    "langchain-openai==1.8.1",
+    "langchain-openrouter==0.2.9",
+    "gunicorn==27.0.1; sys_platform == 'linux'",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest]
+pythonpath = ["."]
+testpaths = ["tests"]

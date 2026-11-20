@@ -26,6 +26,7 @@ Main Project
 ```bash
 COP-3604-High Availability Containerized AI Application Deployment Project/$ tree -F
 ├── .vscode/settings.json   # Editor settings to hide cache file from the file explorer
+├── .vscode/launch.json     # Editor settings to debug the python flask app
 ├── .gitignore              # ignore files from being commited
 ├── .env.example            # Example of a .env without exposing real values
 └── README.md               # Documentation about this project
@@ -49,8 +50,7 @@ COP-3604-High Availability Containerized AI Application Deployment Project/$ tre
 │   ├── ai_provider.py      # code to handle the Langchain LLM logic
 │   └── types.py            # Type definition file
 ├── config.py               # Application configuration settings
-├── pytest.ini              # Pytest configuration for test discovery
-├── requirements.txt        # Python dependencies for the app
+├── pyproject.toml          # Python dependencies for the app
 ├── tests/                  # Automated test suite for the application
 │   ├── conftest.py         # Shared pytest fixtures and setup
 │   └── test_main.py        # Tests for the main application behavior
@@ -102,15 +102,27 @@ graph TD
 
 1. **Installation**
 
+    this project is using [UV](https://docs.astral.sh/uv/), it is 10-100 times faster that pip
+    It also handles python versions, packages, and virtual environments.
+
+    Linux UV installation
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+    Windows UV installation
+
+    ```bash
+    winget install -e --id astral-sh.uv
+    ```
+
    ```bash
     sudo apt update
     sudo apt install git -y
-    sudo apt install python3 python3-pip python3-venv -y # Python 3.14 or later
     git clone https://github.com/nickolasddiaz/COP-3604-High-Availability-Containerized-AI-Application-Deployment-Project.git
     cd COP-3604-High-Availability-Containerized-AI-Application-Deployment-Project
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip3 install -r requirements.txt
+    uv sync # For a production environment without pytest, use uv sync --no-dev
     cp .env.example .env # make sure to fill in the .env and don't leak it
    ```
 
@@ -119,19 +131,26 @@ graph TD
     Run Development Mode
 
     ```bash
-      python wsgi.py
+      uv run python wsgi.py
     ```
 
-    Run the tests with pytest
+    Debug Development Mode with VScode
 
     ```bash
-      pytest -v
+      Open the Run and Debug view (Ctrl+Shift+D)
+      Press Start Debugging
+    ```
+
+    Run the tests with pytest, -v is for verbose
+
+    ```bash
+      uv run pytest -v
     ```
 
     Run in production with Gunicorn (Linux only)
 
     ```bash
-      gunicorn -w 4 -b 127.0.0.1:8000 wsgi:app
+      uv run gunicorn -w 4 -b 127.0.0.1:8000 wsgi:app
     ```
 
 3. **OpenAPI documentation using flasgger**

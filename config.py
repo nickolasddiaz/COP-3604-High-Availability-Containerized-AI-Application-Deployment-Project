@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 
 class Config:
     OPENROUTER_API_KEY: str = os.getenv('OPENROUTER_API_KEY', 'key-does-not-exist')

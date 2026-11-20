@@ -2,6 +2,7 @@
 .vscode/
 .env
 openapi.json
+uv.lock
 
 
 # from https://github.com/github/gitignore/blob/main/Python.gitignore
