@@ -1,6 +1,10 @@
 # Define database service
 services:
   database:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: rag-database
     image: postgres:19rc2 # Use a modern postgres version
     container_name: rag-database
     volumes:
