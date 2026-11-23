@@ -9,14 +9,14 @@ from numba import jit, cuda
 import numpy as np
 
 """
-    Build with "docker build -t rag-db-image ."
+    Build image with "docker build -t rag-db-image ."
     
-    Run with "docker run -e POSTGRES_USER=user \
+    Run image with "docker run -e POSTGRES_USER=user \
     -e POSTGRES_PASSWORD=password \
     -e POSTGRES_DB=rag-db \
     -p 5432:5432 rag-db-image"
     
-    Build and run with "docker build -t rag-db-image . && \
+    Build image and run container with "docker build -t rag-db-image . && \
     docker run -e POSTGRES_USER=user \
     -e POSTGRES_PASSWORD=password \
     -e POSTGRES_DB=rag-db \
