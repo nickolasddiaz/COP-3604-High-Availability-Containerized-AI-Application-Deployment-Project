@@ -3,7 +3,7 @@
 .env
 openapi.json
 uv.lock
-
+.python-version
 
 # from https://github.com/github/gitignore/blob/main/Python.gitignore
 # Byte-compiled / optimized / DLL files

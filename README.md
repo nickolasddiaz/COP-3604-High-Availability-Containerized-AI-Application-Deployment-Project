@@ -59,6 +59,8 @@ COP-3604-High Availability Containerized AI Application Deployment Project/$ tre
 
 ## Diagram
 
+Diagram of the system
+
 ```mermaid
 graph TD
     %% Client & Ingress Tier
@@ -98,11 +100,35 @@ graph TD
     end
 ```
 
+Postgress database with pgvector
+
+```mermaid
+erDiagram
+    chats ||--o{ chat_dialog : "contains (ON DELETE CASCADE)"
+
+    chats {
+        BIGSERIAL chat_id PK "NOT NULL"
+        TEXT chat_name "NOT NULL"
+        vector1536 embedding "NULLABLE, HNSW cosine index"
+        TIMESTAMPTZ created_at "NOT NULL, DEFAULT NOW()"
+        TIMESTAMPTZ updated_at "NOT NULL, DEFAULT NOW()"
+    }
+
+    chat_dialog {
+        BIGSERIAL chat_dialog_id PK "NOT NULL"
+        BIGINT chat_id FK "NOT NULL -> chats.chat_id"
+        TEXT role "NOT NULL, CHECK ('system', 'user')"
+        TEXT_ARRAY file_names "NOT NULL, DEFAULT '{}'"
+        TEXT message "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL, DEFAULT NOW()"
+    }
+```
+
 ## Scripts
 
 1. **Installation**
 
-    this project is using [UV](https://docs.astral.sh/uv/), it is 10-100 times faster that pip
+    This project is using [UV](https://docs.astral.sh/uv/), it is 10-100 times faster that pip
     It also handles python versions, packages, and virtual environments.
 
     Linux UV installation
@@ -122,7 +148,9 @@ graph TD
     sudo apt install git -y
     git clone https://github.com/nickolasddiaz/COP-3604-High-Availability-Containerized-AI-Application-Deployment-Project.git
     cd COP-3604-High-Availability-Containerized-AI-Application-Deployment-Project
+    uv venv
     uv sync # For a production environment without pytest, use uv sync --no-dev
+    # run vscode command: "Python: Select Interpreter" and choose the .venv path
     cp .env.example .env # make sure to fill in the .env and don't leak it
    ```
 
@@ -167,6 +195,29 @@ graph TD
 
     ```bash
       curl http://localhost:8001/apispec_1.json -o openapi.json
+    ```
+
+4. **Postgress database**
+
+    Run the postgress container
+
+    ```bash
+      docker compose up -d database
+    ```
+
+    Useful commands
+
+    ```bash
+      docker stats database
+      docker stop rag-database
+      docker compose down -v
+    ````
+
+    interactive shell
+
+    ```bash
+      docker exec -it rag-database psql -U admin_user -d app_database # type \q to leave
+      docker exec -it rag-database bash # bash shell
     ```
 
 ## Contributers
