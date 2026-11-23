@@ -1,0 +1,6 @@
+PyPDF2
+pdfplumber
+langchain.text_splitters
+gpt4all
+numba
+numpy
