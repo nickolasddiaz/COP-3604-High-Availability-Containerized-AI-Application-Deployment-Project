@@ -1,0 +1,27 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- BIGSERIAL is autoincrementing
+CREATE TABLE IF NOT EXISTS chats (
+    chat_id BIGSERIAL PRIMARY KEY,
+    chat_name TEXT NOT NULL,
+    embedding vector(1536), -- number depends on the embedding model
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS chat_dialog (
+    chat_dialog_id BIGSERIAL PRIMARY KEY,
+    chat_id BIGINT NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE, -- deletes the table if the corresponding chat get deleted
+    role TEXT NOT NULL CHECK (role IN ('system', 'user')),
+    file_names TEXT[] NOT NULL DEFAULT '{}',
+    message TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- index for the chat dialog/chat it
+CREATE INDEX IF NOT EXISTS idx_chat_dialog_chat_id
+    ON chat_dialog (chat_id, created_at);
+
+-- index for the text embeddings
+CREATE INDEX IF NOT EXISTS idx_chats_embedding_hnsw
+    ON chats USING hnsw (embedding vector_cosine_ops);

@@ -4,23 +4,23 @@ from flask import Blueprint, current_app, render_template, request, send_from_di
 from werkzeug.utils import secure_filename
 from app.ai_provider import AIProvider, get_ai_provider
 from app.types import history, chats
+from app.database import Database
+
 
 
 main_bp = Blueprint('main', __name__)
 
-ai_provider: AIProvider
+ai_interface: AIProvider
+db_interface: Database
 
 @main_bp.record_once
 def on_load(state):
-    global ai_provider
-    ai_provider = get_ai_provider(state.app.config)
+    global ai_interface, db_interface
+    ai_interface = get_ai_provider(state.app.config)
+    db_interface = Database(state.app.config["CONNECTIONSTRING"])
 
 # Flask Tutorial: https://www.geeksforgeeks.org/python/flask-tutorial/
 
-chat_history: history = {
-    110:"Testing",
-    111:"Testing 22222222222222222222222222222222222222222",
-        }
 
 @main_bp.route('/')
 def welcome():
@@ -32,7 +32,8 @@ def welcome():
                 examples:
                     text/html: '<html>Rendered index.html</html>'
     """
-    # chat_history = get_chathistory(chat_id)
+    # db_interface.test()
+    chat_history = db_interface.get_chat_history()
     return render_template("index.html", chat_history=chat_history, chat_id="new", current_chat={})
 
 @main_bp.errorhandler(404)
@@ -45,7 +46,7 @@ def page_not_found(_error):
                 examples:
                     text/html: '<html>Rendered 404.html</html>'
     """
-    # chat_history = get_chathistory(chat_id)
+    chat_history = db_interface.get_chat_history()
     return render_template('404.html', chat_history=chat_history), 404
 
 @main_bp.route("/send/new", methods=['POST'])
@@ -85,9 +86,9 @@ def new_new_chat():
     if not message:
         return "message form is needed", 422
     
-    chat_name: str = ai_provider.generateNameofChat(message)
+    chat_name: str = ai_interface.generateNameofChat(message)
 
-    response: str = ai_provider.askQuestion(message)
+    response: str = ai_interface.askQuestion(message)
 
     return {"chat_id": random.randint(1, 0xFFFFFFFF),
             "chat_name": chat_name,
@@ -177,7 +178,7 @@ def chat(chat_id):
     if request.method == 'POST':
         return current_chat
 
-    # chat_history = get_chathistory(chat_id)
+    chat_history = db_interface.get_chat_history()
 
     return render_template("index.html", chat_history=chat_history, chat_id=chat_id, current_chat=current_chat)
 
