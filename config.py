@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from psycopg.conninfo import make_conninfo
 
 class Config:
     OPENROUTER_API_KEY: str = os.getenv('OPENROUTER_API_KEY', ' ')
@@ -12,11 +13,13 @@ class Config:
 
     DB_USER: str = os.getenv("DB_USER", ' ')
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", ' ')
-    DB_HOST: str = os.getenv("DB_HOST", ' ')
+    DB_HOST: str = os.getenv("DB_HOST", 'localhost')
     DB_PORT: str = os.getenv("DB_PORT", ' ')
     DB_NAME: str = os.getenv("DB_NAME", ' ')
 
-    from psycopg.conninfo import make_conninfo
+    if DB_HOST == 'localhost':
+        raise Exception("testing")
+
 
     CONNECTIONSTRING = make_conninfo(
         user=DB_USER,

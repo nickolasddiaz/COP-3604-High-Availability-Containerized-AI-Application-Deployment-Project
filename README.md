@@ -28,7 +28,10 @@ COP-3604-High Availability Containerized AI Application Deployment Project/$ tre
 ├── .vscode/settings.json   # Editor settings to hide cache file from the file explorer
 ├── .vscode/launch.json     # Editor settings to debug the python flask app
 ├── .gitignore              # ignore files from being commited
+├── .dockerignore          # Prevent local environments/secrets from increasing the build context 
 ├── .env.example            # Example of a .env without exposing real values
+├── compose.yaml            # Docker configuration to run all containers
+├── init.sql                # Creates all the tables/indexes for the Postgress app
 └── README.md               # Documentation about this project
 ```
 
@@ -48,6 +51,7 @@ COP-3604-High Availability Containerized AI Application Deployment Project/$ tre
 │   │    ├── base.html      # Shared HTML layout used across pages
 │   │    └── index.html     # Home page template
 │   ├── ai_provider.py      # code to handle the Langchain LLM logic
+│   ├── database.py         # Interface for the Postgress DB
 │   └── types.py            # Type definition file
 ├── config.py               # Application configuration settings
 ├── pyproject.toml          # Python dependencies for the app
@@ -202,7 +206,7 @@ erDiagram
     Run the postgress container
 
     ```bash
-      docker compose up -d database
+      docker compose up -d database --build
     ```
 
     Useful commands
@@ -219,6 +223,34 @@ erDiagram
       docker exec -it rag-database psql -U admin_user -d app_database # type \q to leave
       docker exec -it rag-database bash # bash shell
     ```
+
+5. **Flask App Docker**
+
+    Run the entire app --build to prevent caching, port 8000
+
+    ```bash
+    docker compose up -d flask-app --build
+    ```
+
+    View Flask's logs
+
+    ```bash
+    docker logs -n 50 flask-app
+    ```
+
+    Run the entire app with 3 flask containers being load balanced
+
+    ```bash
+    docker compose up -d --build --scale flask-app=3
+    ```
+
+6. **Nginx Load Balancer**
+
+  Run the entire app --build to prevent caching, port 80
+
+  ```bash
+  docker compose up -d nginx-proxy --build
+  ```
 
 ## Contributers
 

@@ -1,3 +1,8 @@
+SELECT 'CREATE DATABASE mydatabase'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mydatabase')
+\gexec
+\connect mydatabase
+
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- BIGSERIAL is autoincrementing

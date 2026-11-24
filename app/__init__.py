@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, jsonify, render_template
 from flasgger import Swagger
 from config import DevelopmentConfig
 
@@ -17,5 +17,10 @@ def create_app(config_class=DevelopmentConfig):
     # Register Blueprints
     from app.blueprints.main import main_bp
     app.register_blueprint(main_bp)
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(error):
+        app.logger.exception("Unhandled Exception occurred:")
+        return jsonify({"error": "Internal Server Error"}), 500
 
     return app

@@ -11,9 +11,14 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
+      DB_HOST: database
       TZ: America/New_York
     ports:
-      - '${DB_PORT}:5432' # maps DB_PORT to the host machine to port 5432 inside the Docker container
+      - "${DB_PORT}:5432" # maps DB_PORT to the host machine to port 5432 inside the Docker container
+    networks:
+      - backend_net
+    env_file:
+      - .env
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
@@ -28,5 +33,65 @@ services:
     #   watch:
     #     - action: rebuild
     #       path: requirements.txt # Rebuild if requirements.txt changes
+
+  flask-app:
+    container_name: flask-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "8000:8000"
+    networks:
+      - app_net
+      - backend_net
+    depends_on:
+      database:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+  nginx-proxy:
+    build: nginx
+    restart: always
+    container_name: nginx-proxy
+    volumes:
+      - ./nginx/default.conf:/tmp/default.conf
+    environment:
+      - FLASK_SERVER_ADDR=flask-app:8000
+    ports:
+      - "80:80"
+    networks:
+      - app_net
+    depends_on:
+      flask-app:
+        condition: service_healthy
+    healthcheck:
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    command: /app/start.sh
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
 volumes:
   rag_data:
+
+networks:
+  app_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+    internal: true

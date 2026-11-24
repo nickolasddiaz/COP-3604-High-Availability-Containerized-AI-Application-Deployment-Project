@@ -130,7 +130,6 @@ def get_ai_provider(app_config) -> AIProvider:
     based on the LOCAL_AI_DEV toggle in configuration.
     """
 
-    print(app_config["OPENROUTER_API_KEY"])
     if app_config["LOCAL_AI_DEV"]:
         return LocalOllamaProvider(
             model_name=app_config["LOCAL_MODEL"],

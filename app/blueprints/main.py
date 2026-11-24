@@ -1,6 +1,6 @@
 import os
 import random
-from flask import Blueprint, current_app, render_template, request, send_from_directory
+from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 from app.ai_provider import AIProvider, get_ai_provider
 from app.types import history, chats
@@ -217,3 +217,23 @@ def filesvg():
         'file.svg',
         mimetype='image/svg+xml'
     )
+
+@main_bp.route('/flask-health-check')
+def flask_health_check():
+	return "success"
+
+@main_bp.route('/health')
+def healthk():
+	return "success"
+
+@main_bp.route('/info')
+def info():
+
+	resp = {
+		'connecting_ip': request.headers['X-Real-IP'],
+		'proxy_ip': request.headers['X-Forwarded-For'],
+		'host': request.headers['Host'],
+		'user-agent': request.headers['User-Agent']
+	}
+
+	return jsonify(resp)
