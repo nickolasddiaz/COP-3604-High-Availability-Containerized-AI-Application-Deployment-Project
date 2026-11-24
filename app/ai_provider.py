@@ -5,6 +5,9 @@ from langchain_core.messages import BaseMessage
 from langchain_openrouter import ChatOpenRouter
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from app.types import chats
+from langchain_core.embeddings import Embeddings
+from langchain_openai import OpenAIEmbeddings
+from langchain_ollama import OllamaEmbeddings
 
 chatNameTemplate = ChatPromptTemplate(
     [
@@ -139,4 +142,84 @@ def get_ai_provider(app_config) -> AIProvider:
         return OpenRouterProvider(
             api_key=app_config["OPENROUTER_API_KEY"],
             model_name=app_config["OPENROUTER_MODEL"]
+        )
+
+class EmbeddingProvider(ABC):
+    """Abstract base class for embedding providers, mirroring AIProvider."""
+
+    def __init__(self, client: Embeddings, model_name: str):
+        self._client = client
+        self.model_name = model_name
+
+    @abstractmethod
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Generate embedding vectors for a batch of document chunks."""
+        pass
+
+    @abstractmethod
+    def embed_query(self, text: str) -> list[float]:
+        """Generate an embedding vector for a single user search query."""
+        pass
+
+
+class OpenRouterEmbeddingProvider(EmbeddingProvider):
+    """OpenRouter embeddings via OpenAI-compatible /api/v1/embeddings endpoint."""
+
+    def __init__(self, api_key: str, model_name: str, dimensions: int = 768):
+        client = OpenAIEmbeddings(
+            model=model_name,
+            api_key=api_key,  # type: ignore
+            base_url="https://openrouter.ai/api/v1",
+            dimensions=dimensions,
+            check_embedding_ctx_length=False,
+            default_headers={
+                "HTTP-Referer": "https://github.com/nickolasddiaz/COP-3604-High-Availability-Containerized-AI-Application-Deployment-Project",
+                "X-Title": "COP-3604 AI Tutor Project",
+            },
+        )
+        super().__init__(client, model_name)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self._client.embed_documents(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._client.embed_query(text)
+
+
+class LocalOllamaEmbeddingProvider(EmbeddingProvider):
+    """Local CPU Ollama embeddings (e.g., nomic-embed-text)."""
+
+    def __init__(self, model_name: str, base_url: str):
+        client = OllamaEmbeddings(
+            model=model_name,
+            base_url=base_url,
+        )
+        super().__init__(client, model_name)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self._client.embed_documents(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._client.embed_query(text)
+
+
+def get_embedding_provider(app_config: dict) -> EmbeddingProvider:
+    """Factory function mirroring get_ai_provider().
+    Toggles between OpenRouter (dev) and Local Ollama (production) via LOCAL_EMBED_DEV
+    (falls back to LOCAL_AI_DEV if LOCAL_EMBED_DEV is not set).
+    """
+    use_local = app_config.get("LOCAL_EMBED_DEV", app_config.get("LOCAL_AI_DEV", False))
+    if isinstance(use_local, str):
+        use_local = use_local.strip().lower() in ("1", "true", "yes")
+
+    if use_local:
+        return LocalOllamaEmbeddingProvider(
+            model_name=app_config.get("LOCAL_EMBED_MODEL", "nomic-embed-text"),
+            base_url=app_config.get("LOCAL_MODEL_URL", "http://ollama:11434"),
+        )
+    else:
+        return OpenRouterEmbeddingProvider(
+            api_key=app_config["OPENROUTER_API_KEY"],
+            model_name=app_config.get("OPENROUTER_EMBED_MODEL", "openai/text-embedding-3-small"),
+            dimensions=int(app_config.get("EMBEDDING_DIM", 768)),
         )
