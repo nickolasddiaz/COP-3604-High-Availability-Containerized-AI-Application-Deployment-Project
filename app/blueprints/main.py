@@ -85,12 +85,18 @@ def new_new_chat():
     message = request.form.get("message")
     if not message:
         return "message form is needed", 422
+
+    uploaded_files = request.files.getlist("uploaded_files")
+    file_names = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
     
     chat_name: str = ai_interface.generateNameofChat(message)
 
     response: str = ai_interface.askQuestion(message)
 
-    return {"chat_id": random.randint(1, 0xFFFFFFFF),
+    chat_id = db_interface.set_new_chat(chat_name, message, file_names, None)
+    db_interface.append_to_chat(chat_id, "", response, [], None)
+
+    return {"chat_id": chat_id,
             "chat_name": chat_name,
             "message": response
             }
@@ -128,7 +134,16 @@ def send_chat(chat_id):
                             example: Ai generated reponse Hello
     """
     message = request.form.get("message")
-    return {"message": f"Ai generated reponse: {message}"}
+    if not message:
+         return "message form is needed", 422
+
+    uploaded_files = request.files.getlist("uploaded_files")
+    file_names = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
+
+    response: str = ai_interface.askQuestion(message)
+    db_interface.append_to_chat(chat_id, message, response, file_names, None)
+
+    return {"message": response}
 
 @main_bp.route("/chat/<int:chat_id>", methods=['GET','POST'])
 def chat(chat_id):
@@ -166,13 +181,8 @@ def chat(chat_id):
                 description: Method not allowed.
     """
 
-    # example
-    current_chat: list[chats] = [
-        {'role': 'user', 'content': 'Hello how are you.', 'files': ["test1.txt", "test2.txt", "test3.txt"]},
-        {'role': 'system', 'content': 'I am doing great, do you have any questions.', 'files': []},
-        {'role': 'user', 'content': 'pls let me pass on god.', 'files': ["plshelp.pdf"]},
-        {'role': 'system', 'content': 'you are beyond help.', 'files': []},
-    ]
+
+    current_chat: list[chats] = db_interface.get_chat(chat_id)
 
     # Get return the rendered_template
     if request.method == 'POST':
