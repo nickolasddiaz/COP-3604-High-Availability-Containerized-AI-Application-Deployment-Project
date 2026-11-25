@@ -1,5 +1,4 @@
 import os
-import random
 from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 from app.ai_provider import AIProvider, get_ai_provider
@@ -32,8 +31,7 @@ def welcome():
                 examples:
                     text/html: '<html>Rendered index.html</html>'
     """
-    # db_interface.test()
-    chat_history = db_interface.get_chat_history()
+    chat_history: history = db_interface.get_chat_history()
     return render_template("index.html", chat_history=chat_history, chat_id="new", current_chat={})
 
 @main_bp.errorhandler(404)
@@ -82,27 +80,26 @@ def new_new_chat():
                             type: string
                             example: Ai generated reponse Hello
     """
-    message = request.form.get("message")
-    if not message:
+    user_message = request.form.get("message")
+    if not user_message:
         return "message form is needed", 422
 
     uploaded_files = request.files.getlist("uploaded_files")
     file_names = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
     
-    chat_name: str = ai_interface.generateNameofChat(message)
+    chat_name: str = ai_interface.generateNameofChat(user_message)
 
-    response: str = ai_interface.askQuestion(message)
+    system_message: str = ai_interface.askQuestion(user_message)
 
-    chat_id = db_interface.set_new_chat(chat_name, message, file_names, None)
-    db_interface.append_to_chat(chat_id, "", response, [], None)
+    chat_id = db_interface.set_new_chat(chat_name, user_message, system_message, file_names, None)
 
     return {"chat_id": chat_id,
             "chat_name": chat_name,
-            "message": response
+            "message": system_message
             }
 
 @main_bp.route("/send/<int:chat_id>", methods=['POST'])
-def send_chat(chat_id):
+def send_chat(chat_id: int):
     """Send a message to an existing chat and return a placeholder response.
         ---
         consumes:
@@ -133,20 +130,21 @@ def send_chat(chat_id):
                             type: string
                             example: Ai generated reponse Hello
     """
-    message = request.form.get("message")
-    if not message:
+    user_message = request.form.get("message")
+    if not user_message:
          return "message form is needed", 422
 
     uploaded_files = request.files.getlist("uploaded_files")
     file_names = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
 
-    response: str = ai_interface.askQuestion(message)
-    db_interface.append_to_chat(chat_id, message, response, file_names, None)
+    current_chat: list[chats] = db_interface.get_chat(chat_id)
+    system_message: str = ai_interface.askQuestion(user_message, current_chat)
+    db_interface.append_to_chat(chat_id, user_message, system_message, file_names, None)
 
-    return {"message": response}
+    return {"message": system_message}
 
 @main_bp.route("/chat/<int:chat_id>", methods=['GET','POST'])
-def chat(chat_id):
+def chat(chat_id: int):
     """Display a chat page or return its placeholder transcript.
         ---
         parameters:
@@ -181,14 +179,13 @@ def chat(chat_id):
                 description: Method not allowed.
     """
 
-
     current_chat: list[chats] = db_interface.get_chat(chat_id)
 
     # Get return the rendered_template
     if request.method == 'POST':
         return current_chat
 
-    chat_history = db_interface.get_chat_history()
+    chat_history: history = db_interface.get_chat_history()
 
     return render_template("index.html", chat_history=chat_history, chat_id=chat_id, current_chat=current_chat)
 

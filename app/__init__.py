@@ -1,6 +1,17 @@
+import sys
 from flask import Flask, jsonify, render_template
 from flasgger import Swagger
 from config import DevelopmentConfig
+from werkzeug.exceptions import HTTPException
+import logging
+
+
+# Configure root logger to output to stdout/stderr
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] %(levelname)s in %(module)s: %(message)s",
+    stream=sys.stdout
+)
 
 def create_app(config_class=DevelopmentConfig):
     app = Flask(__name__)
@@ -18,9 +29,11 @@ def create_app(config_class=DevelopmentConfig):
     from app.blueprints.main import main_bp
     app.register_blueprint(main_bp)
 
-    @app.errorhandler(Exception)
-    def handle_unexpected_error(error):
-        app.logger.exception("Unhandled Exception occurred:")
-        return jsonify({"error": "Internal Server Error"}), 500
+    # @app.errorhandler(Exception)
+    # def handle_unexpected_error(error):
+    #     if isinstance(e, HTTPException):
+    #         return e
+    #     app.logger.exception("Unhandled Exception occurred:")
+    #     return jsonify({"error": "Internal Server Error"}), 500
 
     return app
