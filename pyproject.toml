@@ -12,6 +12,7 @@ dependencies = [
     "langchain-openai==1.8.1",
     "langchain-openrouter==0.2.9",
     "langchain-postgres==0.0.19",
+    "langchain-ollama==1.2.0",
     "gunicorn==27.0.1; sys_platform == 'linux'",
 ]
 

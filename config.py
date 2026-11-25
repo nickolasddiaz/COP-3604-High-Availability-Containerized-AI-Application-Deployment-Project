@@ -3,23 +3,20 @@ from dotenv import load_dotenv
 from psycopg.conninfo import make_conninfo
 
 class Config:
-    OPENROUTER_API_KEY: str = os.getenv('OPENROUTER_API_KEY', ' ')
-    OPENROUTER_MODEL: str = os.getenv('OPENROUTER_MODEL', ' ')
+    load_dotenv()
+    OPENROUTER_API_KEY:str = os.environ['OPENROUTER_API_KEY']
+    OPENROUTER_MODEL:str  = os.environ['OPENROUTER_MODEL']
 
-    LOCAL_AI_DEV: bool = os.getenv('LOCAL_AI_DEV', 'false').lower() == 'true'
-    LOCAL_MODEL: str = os.getenv('LOCAL_MODEL', 'llama3.2')
-    LOCAL_MODEL_URL: str = os.getenv('LOCAL_MODEL_URL', 'http://localhost:11434')
+    LOCAL_AI_DEV:bool = os.environ['LOCAL_AI_DEV'].lower() == 'true'
+    LOCAL_MODEL:str  = os.environ['LOCAL_MODEL']
+    LOCAL_MODEL_URL:str  = os.environ['LOCAL_MODEL_URL']
 
 
-    DB_USER: str = os.getenv("DB_USER", ' ')
-    DB_PASSWORD: str = os.getenv("DB_PASSWORD", ' ')
-    DB_HOST: str = os.getenv("DB_HOST", 'localhost')
-    DB_PORT: str = os.getenv("DB_PORT", ' ')
-    DB_NAME: str = os.getenv("DB_NAME", ' ')
-
-    if DB_HOST == 'localhost':
-        raise Exception("testing")
-
+    DB_USER:str  = os.environ["DB_USER"]
+    DB_PASSWORD:str  = os.environ["DB_PASSWORD"]
+    DB_HOST:str  = os.environ["DB_HOST"]
+    DB_PORT:str  = os.environ["DB_PORT"]
+    DB_NAME:str  = os.environ["DB_NAME"]
 
     CONNECTIONSTRING = make_conninfo(
         user=DB_USER,
