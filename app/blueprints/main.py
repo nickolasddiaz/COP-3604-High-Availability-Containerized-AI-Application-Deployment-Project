@@ -1,8 +1,9 @@
 import os
 from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
 from app.ai_provider import AIProvider, get_ai_provider
-from app.types import history, chats
+from app.types import history, chats, chats_with_embeddings
 from app.database import Database
 
 
@@ -89,9 +90,13 @@ def new_new_chat():
     
     chat_name: str = ai_interface.generateNameofChat(user_message)
 
-    system_message: str = ai_interface.askQuestion(user_message)
+    current_embedings = None
+    if uploaded_files:
+        current_embedings = ai_interface.embed_documents(uploaded_files)
 
-    chat_id = db_interface.set_new_chat(chat_name, user_message, system_message, file_names, None)
+    system_message: str = ai_interface.askQuestion(user_message, current_embedings, [])
+
+    chat_id = db_interface.set_new_chat(chat_name, user_message, system_message, file_names, current_embedings)
 
     return {"chat_id": chat_id,
             "chat_name": chat_name,
@@ -134,12 +139,18 @@ def send_chat(chat_id: int):
     if not user_message:
          return "message form is needed", 422
 
-    uploaded_files = request.files.getlist("uploaded_files")
-    file_names = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
+    uploaded_files: list[FileStorage] = request.files.getlist("uploaded_files")
+    file_names: list[str] = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
 
-    current_chat: list[chats] = db_interface.get_chat(chat_id)
-    system_message: str = ai_interface.askQuestion(user_message, current_chat)
-    db_interface.append_to_chat(chat_id, user_message, system_message, file_names, None)
+    current_chat: list[chats_with_embeddings] = db_interface.get_chat_with_embeddings(chat_id)
+
+    current_embedings = None
+    if uploaded_files:
+        current_embedings = ai_interface.embed_documents(uploaded_files)
+
+    system_message: str = ai_interface.askQuestion(user_message, current_embedings, current_chat)
+
+    db_interface.append_to_chat(chat_id, user_message, system_message, file_names, current_embedings)
 
     return {"message": system_message}
 

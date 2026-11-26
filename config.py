@@ -11,12 +11,18 @@ class Config:
     LOCAL_MODEL:str  = os.environ['LOCAL_MODEL']
     LOCAL_MODEL_URL:str  = os.environ['LOCAL_MODEL_URL']
 
-
     DB_USER:str  = os.environ["DB_USER"]
     DB_PASSWORD:str  = os.environ["DB_PASSWORD"]
     DB_HOST:str  = os.environ["DB_HOST"]
     DB_PORT:str  = os.environ["DB_PORT"]
     DB_NAME:str  = os.environ["DB_NAME"]
+
+    OPENROUTER_EMBED_MODEL:str = os.environ["OPENROUTER_EMBED_MODEL"]
+    EMBEDDING_DIM:int = int(os.environ["EMBEDDING_DIM"])
+
+    LOCAL_EMBED_MODEL:str = os.environ["LOCAL_EMBED_MODEL"]
+    LOCAL_EMBED_MODEL_URL:str = os.environ["LOCAL_EMBED_MODEL_URL"]
+
 
     CONNECTIONSTRING = make_conninfo(
         user=DB_USER,
