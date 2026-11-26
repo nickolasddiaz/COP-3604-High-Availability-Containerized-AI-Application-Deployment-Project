@@ -14,7 +14,7 @@ The primary objective of this team-based project is to architect, implement, and
 - **Prometheus + Grafana**: System monitoring and observability
 - **Python Flask**: Web framework in python for REST APIs
 - **Self Hosted LLM**: To be decided
-- **Docker**:
+- **Docker**: A single compose.yaml for many services
 - **Cloud Compute**: Google Compute Engine (GCE)
 - **Terraform**: Infrastructure as Code (IaC), Cloud Deployment
 - **Security**: Google VPC (with firewall rules), Secret Manager and IAM service accounts
@@ -50,15 +50,26 @@ COP-3604-High Availability Containerized AI Application Deployment Project/$ tre
 │   │    ├── 404.html       # Custom 404 error page
 │   │    ├── base.html      # Shared HTML layout used across pages
 │   │    └── index.html     # Home page template
+│   ├─── Dockerfile         # Dockerfile for the flask app
 │   ├── ai_provider.py      # code to handle the Langchain LLM logic
 │   ├── database.py         # Interface for the Postgress DB
 │   └── types.py            # Type definition file
-├── config.py               # Application configuration settings
-├── pyproject.toml          # Python dependencies for the app
 ├── tests/                  # Automated test suite for the application
 │   ├── conftest.py         # Shared pytest fixtures and setup
 │   └── test_main.py        # Tests for the main application behavior
+├── config.py               # Application configuration settings
+├── pyproject.toml          # Python dependencies for the app
 └── wsgi.py                 # WSGI entrypoint for running the app in production
+```
+
+NGINX Load Balancer
+
+```bash
+COP-3604-High Availability Containerized AI Application Deployment Project/$ tree -F
+├── default.conf            # App routing rules
+├── Dockerfile              # Dockerfile for the NGINX app
+├── nginx.conf              # primary configuration file
+└── start.sh                # shell command to set $FLASK_SERVER_ADDR
 ```
 
 ## Diagram
@@ -108,23 +119,32 @@ Postgress database with pgvector
 
 ```mermaid
 erDiagram
-    chats ||--o{ chat_dialog : "contains (ON DELETE CASCADE)"
+    chats ||--o{ chat_dialog : "has many (CASCADE)"
+    chat_dialog ||--o{ document_chunks : "has many (CASCADE)"
 
     chats {
-        BIGSERIAL chat_id PK "NOT NULL"
-        TEXT chat_name "NOT NULL"
-        vector1536 embedding "NULLABLE, HNSW cosine index"
-        TIMESTAMPTZ created_at "NOT NULL, DEFAULT NOW()"
-        TIMESTAMPTZ updated_at "NOT NULL, DEFAULT NOW()"
+        BIGSERIAL chat_id PK
+        TEXT chat_name
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
     }
 
     chat_dialog {
-        BIGSERIAL chat_dialog_id PK "NOT NULL"
-        BIGINT chat_id FK "NOT NULL -> chats.chat_id"
-        TEXT role "NOT NULL, CHECK ('system', 'user')"
-        TEXT_ARRAY file_names "NOT NULL, DEFAULT '{}'"
-        TEXT message "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL, DEFAULT NOW()"
+        BIGSERIAL chat_dialog_id PK
+        BIGINT chat_id FK
+        TEXT role "CHECK: system, user"
+        TEXT[] file_names
+        TEXT message
+        TIMESTAMPTZ created_at
+    }
+
+    document_chunks {
+        BIGSERIAL chunk_id PK
+        BIGINT chat_dialog_id FK "nullable"
+        TEXT source_file
+        INTEGER chunk_index
+        TEXT content
+        vector_768 embedding
     }
 ```
 
@@ -158,7 +178,9 @@ erDiagram
     cp .env.example .env # make sure to fill in the .env and don't leak it
    ```
 
-2. **Run the Python app**
+2. **Run the Python Flask app**
+
+    It needs the .env set and the Postgress DB running
 
     Run Development Mode
 
@@ -226,7 +248,7 @@ erDiagram
 
 5. **Flask App Docker**
 
-    Run the entire app --build to prevent caching, port 8000
+    Run the entire app --build to prevent caching, port 8001
 
     ```bash
     docker compose up -d flask-app --build
@@ -238,18 +260,18 @@ erDiagram
     docker logs -n 50 flask-app
     ```
 
-    Run the entire app with 3 flask containers being load balanced
-
-    ```bash
-    docker compose up -d --build --scale flask-app=3
-    ```
-
 6. **Nginx Load Balancer**
 
   Run the entire app --build to prevent caching, port 80
 
   ```bash
   docker compose up -d nginx-proxy --build
+  ```
+
+  Run the entire app with 3 flask containers being load balanced
+
+  ```bash
+  docker compose up -d --build --scale flask-app=3
   ```
 
 ## Contributers

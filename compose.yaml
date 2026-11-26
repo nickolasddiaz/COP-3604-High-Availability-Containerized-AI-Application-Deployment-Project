@@ -38,7 +38,7 @@ services:
     container_name: flask-app
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./app/Dockerfile
     restart: unless-stopped
     env_file:
       - .env
@@ -48,7 +48,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "8000:8000"
+      - "8001:8001"
     networks:
       - app_net
       - backend_net
@@ -67,7 +67,7 @@ services:
     volumes:
       - ./nginx/default.conf:/tmp/default.conf
     environment:
-      - FLASK_SERVER_ADDR=flask-app:8000
+      - FLASK_SERVER_ADDR=flask-app:8001
     ports:
       - "80:80"
     networks:

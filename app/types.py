@@ -1,16 +1,18 @@
 from typing import Literal, TypedDict
 
+type history = dict[int, str]
+type embedding_list = list[list[float]]
 
 class chats(TypedDict):
     role: Literal['user', 'system']
     content: str
     files: list[str]
 
-# current_chat: list[chats] = [
-#         {'role': 'user', 'content': 'Hello how are you.', 'files': ["test1.txt", "test2.txt", "test3.txt"]},
-#         {'role': 'system', 'content': 'I am doing great, do you have any questions.', 'files': []},
-#         {'role': 'user', 'content': 'pls let me pass on god.', 'files': ["plshelp.pdf"]},
-#         {'role': 'system', 'content': 'you are beyond help.', 'files': []},
-#     ]
+class chats_with_embeddings(chats):
+    embeddings: embedding_list
 
-type history = dict[int, str]
+def embedings_into_string(embeddings: embedding_list|None) -> str|None:
+    if embeddings == None:
+        return None
+
+    return "[" + ",".join(map(str, embeddings[0])) + "]"

@@ -17,6 +17,8 @@ dependencies = [
     "langchain-openrouter==0.2.9",
     "langchain-postgres==0.0.19",
     "langchain-ollama==1.2.0",
+    "pypdf==7.1.1",
+    "langchain-community==0.4.2",
     "gunicorn==27.0.1; sys_platform == 'linux'",
     
 ]
