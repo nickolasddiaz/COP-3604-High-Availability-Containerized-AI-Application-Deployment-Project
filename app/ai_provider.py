@@ -9,9 +9,11 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from werkzeug.datastructures import FileStorage
-from app.types import embedding_list, chats_with_embeddings
 from langchain_community.document_loaders import PyPDFLoader
+from werkzeug.utils import secure_filename
+from app.types import DocumentChunk, RetrievedChunk, chats, embedding_vector
 
 
 default_headers: Mapping[str, str] = {
@@ -20,6 +22,9 @@ default_headers: Mapping[str, str] = {
 }
 
 base_url="https://openrouter.ai/api/v1"
+
+CHUNK_SIZE = 1000      # characters per chunk
+CHUNK_OVERLAP = 150    # characters shared between neighbouring chunks
 
 chatNameTemplate = ChatPromptTemplate(
     [
@@ -65,8 +70,25 @@ mainPrompt = ChatPromptTemplate([
     Example system 4: "[Congratulate the student on their success]"
     '''),
     MessagesPlaceholder("history"),
-    ("human", "{user_input}"),
+    ("human", "{context}{user_input}"),
 ])
+
+def format_context(chunks: list[RetrievedChunk]) -> str:
+    """Turn the retrieved chunks into the text placed in front of the user's question."""
+    if not chunks:
+        return ""
+
+    excerpts = "\n\n".join(
+        f"[{i}] (source: {chunk['source_file']})\n{chunk['content']}"
+        for i, chunk in enumerate(chunks, start=1)
+    )
+    return (
+        "The following excerpts were retrieved from the user's uploaded documents. "
+        "Use them if they are relevant to the question and mention the source file name when you rely on them. "
+        "If they are not relevant, ignore them.\n\n"
+        f"<documents>\n{excerpts}\n</documents>\n\n"
+        "Question: "
+    )
 
 class AIProvider(ABC):
     """Abstract base class for AI inference providers.
@@ -80,6 +102,10 @@ class AIProvider(ABC):
 
         self._embed_client = embed_client
         self.embed_model_name = embed_model_name
+        self._splitter = RecursiveCharacterTextSplitter(
+            chunk_size=CHUNK_SIZE,
+            chunk_overlap=CHUNK_OVERLAP,
+        )
 
     def generateNameofChat(self, prompt: str) -> str:
         response = self._chatNameChain.invoke({
@@ -89,24 +115,23 @@ class AIProvider(ABC):
             return str(response.get("content", "Homework Help"))
         return str(response.content)
 
-    def askQuestion(self, prompt: str, current_embedings: embedding_list | None, chat_history: list[chats_with_embeddings]) -> str:
-        history: list[tuple[Literal["user", "system"], str]] = [
-            (chat["role"], chat["content"]) for chat in chat_history
+    def askQuestion(self, prompt: str, retrieved_chunks: list[RetrievedChunk], chat_history: list[chats]) -> str:
+        """Answer `prompt`, giving the model only the chunks that were retrieved for it."""
+        # The database stores assistant replies with role "system"; the model must see them as "ai",
+        # otherwise earlier answers would be treated as system instructions.
+        history: list[tuple[Literal["human", "ai"], str]] = [
+            ("human" if chat["role"] == "user" else "ai", chat["content"])
+            for chat in chat_history
         ]
-        embedding_context = {
-            "current_embeddings": current_embedings,
-            "chat_history_embeddings": [chat["embeddings"] for chat in chat_history],
-        }
         response = self._mainPromptChain.invoke({
             "history": history,
+            "context": format_context(retrieved_chunks),
             "user_input": prompt,
         })
         return str(response.content)
 
     @staticmethod
-    def _load_txt_md_from_upload(file_storage: FileStorage) -> list[Document]:
-        filename = Path(file_storage.filename or "upload.txt").name
-
+    def _load_txt_md_from_upload(file_storage: FileStorage, filename: str) -> list[Document]:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / filename
             file_storage.save(str(path))
@@ -114,31 +139,58 @@ class AIProvider(ABC):
         return [Document(page_content=text, metadata={"source": filename})]
 
     @staticmethod
-    def _load_pdf_from_upload(file_storage: FileStorage) -> list[Document]:
-        filename = Path(file_storage.filename or "upload.pdf").name
-
+    def _load_pdf_from_upload(file_storage: FileStorage, filename: str) -> list[Document]:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / filename
             file_storage.save(str(path))
-            loader = PyPDFLoader(str(path))
-            return loader.load()
+            documents = PyPDFLoader(str(path)).load()
+        # PyPDFLoader sets source to the temp path, replace it with the real file name
+        for document in documents:
+            document.metadata["source"] = filename
+        return documents
 
-    def embed_documents(self, files: list[FileStorage]) -> embedding_list:
+    def chunk_and_embed(self, files: list[FileStorage]) -> list[DocumentChunk]:
+        """Load the uploaded files, split them into chunks and embed every chunk.
+        The result is stored in the database; nothing here goes into a prompt."""
         documents: list[Document] = []
         for file_storage in files:
-            suffix = Path(file_storage.filename or "").suffix.lower()
+            filename = secure_filename(file_storage.filename or "") or "upload"
+            suffix = Path(filename).suffix.lower()
             if suffix == ".pdf":
-                documents.extend(self._load_pdf_from_upload(file_storage))
+                documents.extend(self._load_pdf_from_upload(file_storage, filename))
             elif suffix in {".txt", ".md"}:
-                documents.extend(self._load_txt_md_from_upload(file_storage))
+                documents.extend(self._load_txt_md_from_upload(file_storage, filename))
             else:
                 raise ValueError("Only .pdf, .txt, and .md files are supported")
 
-        if not documents:
+        # PDFs can contain NUL characters, which Postgres TEXT columns reject
+        split_docs = [
+            doc for doc in self._splitter.split_documents(documents)
+            if doc.page_content.replace("\x00", "").strip()
+        ]
+        if not split_docs:
             return []
-        return self._embed_client.embed_documents(
-            [document.page_content for document in documents]
-        )
+
+        texts = [doc.page_content.replace("\x00", "") for doc in split_docs]
+        vectors = self._embed_client.embed_documents(texts)
+
+        next_index: dict[str, int] = {}
+        chunks: list[DocumentChunk] = []
+        for doc, text, vector in zip(split_docs, texts, vectors):
+            source = str(doc.metadata["source"])
+            index = next_index.get(source, 0)
+            next_index[source] = index + 1
+            chunks.append({
+                "source_file": source,
+                "chunk_index": index,
+                "content": text,
+                "embedding": vector,
+            })
+        return chunks
+
+    def embed_query(self, text: str) -> embedding_vector:
+        """Embed the user's question so it can be compared against the stored chunks."""
+        return self._embed_client.embed_query(text)
 
     
 

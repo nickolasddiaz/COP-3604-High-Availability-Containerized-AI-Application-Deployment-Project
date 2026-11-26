@@ -65,7 +65,7 @@ COP-3604-High Availability Containerized AI Application Deployment Project/$ tre
 NGINX Load Balancer
 
 ```bash
-COP-3604-High Availability Containerized AI Application Deployment Project/$ tree -F
+COP-3604-High Availability Containerized AI Application Deployment Project/nginx/$ tree -F
 ├── default.conf            # App routing rules
 ├── Dockerfile              # Dockerfile for the NGINX app
 ├── nginx.conf              # primary configuration file
@@ -119,8 +119,9 @@ Postgress database with pgvector
 
 ```mermaid
 erDiagram
-    chats ||--o{ chat_dialog : "has many (CASCADE)"
-    chat_dialog ||--o{ document_chunks : "has many (CASCADE)"
+    chats ||--o{ chat_dialog : "has messages (ON DELETE CASCADE)"
+    chats ||--o{ document_chunks : "scopes chunks (ON DELETE CASCADE)"
+    chat_dialog ||--o{ document_chunks : "uploads files for (ON DELETE CASCADE)"
 
     chats {
         BIGSERIAL chat_id PK
@@ -132,7 +133,7 @@ erDiagram
     chat_dialog {
         BIGSERIAL chat_dialog_id PK
         BIGINT chat_id FK
-        TEXT role "CHECK: system, user"
+        TEXT role
         TEXT[] file_names
         TEXT message
         TIMESTAMPTZ created_at
@@ -140,7 +141,8 @@ erDiagram
 
     document_chunks {
         BIGSERIAL chunk_id PK
-        BIGINT chat_dialog_id FK "nullable"
+        BIGINT chat_id FK
+        BIGINT chat_dialog_id FK
         TEXT source_file
         INTEGER chunk_index
         TEXT content
@@ -242,7 +244,7 @@ erDiagram
     interactive shell
 
     ```bash
-      docker exec -it rag-database psql -U admin_user -d app_database # type \q to leave
+      docker exec -it rag-database psql -U admin_user -d mydatabase # type \q to leave
       docker exec -it rag-database bash # bash shell
     ```
 
@@ -262,17 +264,17 @@ erDiagram
 
 6. **Nginx Load Balancer**
 
-  Run the entire app --build to prevent caching, port 80
+    Run the entire app --build to prevent caching, port 80
 
-  ```bash
-  docker compose up -d nginx-proxy --build
-  ```
+    ```bash
+    docker compose up -d nginx-proxy --build
+    ```
 
-  Run the entire app with 3 flask containers being load balanced
+    Run the entire app with 3 flask containers being load balanced
 
-  ```bash
-  docker compose up -d --build --scale flask-app=3
-  ```
+    ```bash
+    docker compose up -d --build --scale flask-app=3
+    ```
 
 ## Contributers
 

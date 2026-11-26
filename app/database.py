@@ -1,12 +1,12 @@
 from langchain_postgres import PGVector
 import psycopg
 
-from app.types import embedings_into_string, history, chats, embedding_list, chats_with_embeddings
+from app.types import embedding_to_pgvector, history, chats, embedding_vector, DocumentChunk, RetrievedChunk
 
 class Database:
     def __init__(self, conn_str: str):
         self.conn_str = conn_str
-        with psycopg.connect(self.conn_str) as conn:
+        with psycopg.connect(self.conn_str, connect_timeout=5) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT version();")
                 row = cur.fetchone()
@@ -23,31 +23,30 @@ class Database:
 
         return dict(rows)
 
-
-    def set_new_chat(self, chat_name: str, user_message: str, system_message: str, file_names: list[str], current_embeddings: embedding_list|None) -> int:
+    def create_chat(self, chat_name: str) -> int:
         with psycopg.connect(self.conn_str) as conn:
-            with conn.transaction():
-                with conn.cursor() as cur:
-                    cur.execute("INSERT INTO chats (chat_name) VALUES (%s) RETURNING chat_id;", (chat_name,))
-                    row = cur.fetchone()
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO chats (chat_name) VALUES (%s) RETURNING chat_id;", (chat_name,))
+                row = cur.fetchone()
 
-                if row is None:
-                    raise RuntimeError("Failed to create new chat row")
-                chat_id = int(row[0])
-                user_embedding = embedings_into_string(current_embeddings)
-                conn.execute(
-                    "INSERT INTO chat_dialog (chat_id, role, file_names, embedding, message)"
-                    "VALUES (%s, 'user', %s, %s::vector, %s)",
-                    (chat_id, file_names, user_embedding, user_message),
-                )
-                conn.execute("INSERT INTO chat_dialog (chat_id, role, message) VALUES (%s, 'system', %s)", (chat_id, system_message))
+        if row is None:
+            raise RuntimeError("Failed to create new chat row")
+        return int(row[0])
 
-            return chat_id
+    def delete_chat(self, chat_id: int) -> None:
+        """Cascades to chat_dialog and document_chunks."""
+        with psycopg.connect(self.conn_str) as conn:
+            conn.execute("DELETE FROM chats WHERE chat_id = %s;", (chat_id,))
+
 
     def get_chat(self, chat_id: int) -> list[chats]:
         with psycopg.connect(self.conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT role, message, file_names FROM chat_dialog WHERE chat_id = %s ORDER BY created_at ASC, chat_dialog_id ASC;", (chat_id,))
+                cur.execute(
+                    "SELECT role, message, file_names FROM chat_dialog "
+                    "WHERE chat_id = %s ORDER BY created_at ASC, chat_dialog_id ASC;",
+                    (chat_id,),
+                )
                 rows = cur.fetchall()
 
         return [
@@ -57,27 +56,96 @@ class Database:
             for row in rows
         ]
 
-    def get_chat_with_embeddings(self, chat_id: int) -> list[chats_with_embeddings]:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT role, message, file_names, embedding FROM chat_dialog WHERE chat_id = %s ORDER BY created_at ASC, chat_dialog_id ASC;", (chat_id,))
-                    rows = cur.fetchall()
-    
-            return [
-                {
-                    "role": row[0],
-                    "content": row[1],
-                    "files": row[2] if row[2] is not None else [],
-                    "embeddings": row[3] if row[3] is not None else []
-                }
-                for row in rows
-            ]
 
-    def append_to_chat(self, chat_id: int, user_message: str, system_message: str, user_files: list[str], current_embeddings: embedding_list|None) -> None:
+    def add_user_message(
+        self,
+        chat_id: int,
+        message: str,
+        file_names: list[str],
+        chunks: list[DocumentChunk],
+    ) -> int:
+        """Store the user's message and the chunks of any files they uploaded, atomically.
+        Returns the chat_dialog_id of the new message."""
         with psycopg.connect(self.conn_str) as conn:
             with conn.transaction():
-                user_embedding = embedings_into_string(current_embeddings)
-                conn.execute("INSERT INTO chat_dialog (chat_id, role, file_names, embedding, message) VALUES (%s, 'user', %s, %s::vector,  %s);", (chat_id, user_files, user_embedding, user_message))
-                conn.execute("INSERT INTO chat_dialog (chat_id, role, message) VALUES (%s, 'system', %s);", (chat_id, system_message))
-                conn.execute("UPDATE chats SET updated_at = NOW() WHERE chat_id = %s;", (chat_id,),)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO chat_dialog (chat_id, role, file_names, message) "
+                        "VALUES (%s, 'user', %s, %s) RETURNING chat_dialog_id;",
+                        (chat_id, file_names, message),
+                    )
+                    row = cur.fetchone()
+                    if row is None:
+                        raise RuntimeError("Failed to insert user message")
+                    chat_dialog_id = int(row[0])
+
+                    if chunks:
+                        cur.executemany(
+                            "INSERT INTO document_chunks "
+                            "(chat_id, chat_dialog_id, source_file, chunk_index, content, embedding) "
+                            "VALUES (%s, %s, %s, %s, %s, %s::vector);",
+                            [
+                                (
+                                    chat_id,
+                                    chat_dialog_id,
+                                    c["source_file"],
+                                    c["chunk_index"],
+                                    c["content"],
+                                    embedding_to_pgvector(c["embedding"]),
+                                )
+                                for c in chunks
+                            ],
+                        )
+        return chat_dialog_id
+
+    def add_system_message(self, chat_id: int, message: str) -> None:
+        with psycopg.connect(self.conn_str) as conn:
+            with conn.transaction():
+                conn.execute(
+                    "INSERT INTO chat_dialog (chat_id, role, message) VALUES (%s, 'system', %s);",
+                    (chat_id, message),
+                )
+                conn.execute("UPDATE chats SET updated_at = NOW() WHERE chat_id = %s;", (chat_id,))
+
+    def delete_dialog_message(self, chat_dialog_id: int) -> None:
+        """Used to roll back a user message if answering failed.
+        Cascades to the document_chunks uploaded with that message."""
+        with psycopg.connect(self.conn_str) as conn:
+            conn.execute("DELETE FROM chat_dialog WHERE chat_dialog_id = %s;", (chat_dialog_id,))
+
+    def chat_has_chunks(self, chat_id: int) -> bool:
+        """Cheap check so we can skip embedding the query for chats without documents."""
+        with psycopg.connect(self.conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT EXISTS (SELECT 1 FROM document_chunks WHERE chat_id = %s);",
+                    (chat_id,),
+                )
+                row = cur.fetchone()
+        return row is not None and bool(row[0])
+
+    def search_chunks(self, chat_id: int, query_embedding: embedding_vector, k: int = 4) -> list[RetrievedChunk]:
+        """Return the k chunks in this chat closest to the query (cosine distance)."""
+        vector = embedding_to_pgvector(query_embedding)
+        with psycopg.connect(self.conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT source_file, chunk_index, content, embedding <=> %s::vector AS distance "
+                    "FROM document_chunks "
+                    "WHERE chat_id = %s "
+                    "ORDER BY embedding <=> %s::vector "
+                    "LIMIT %s;",
+                    (vector, chat_id, vector, k),
+                )
+                rows = cur.fetchall()
+
+        return [
+            {
+                "source_file": row[0],
+                "chunk_index": row[1],
+                "content": row[2],
+                "distance": float(row[3]),
+            }
+            for row in rows
+        ]
 

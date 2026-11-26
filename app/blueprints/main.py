@@ -3,12 +3,14 @@ from flask import Blueprint, current_app, jsonify, render_template, request, sen
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 from app.ai_provider import AIProvider, get_ai_provider
-from app.types import history, chats, chats_with_embeddings
+from app.types import history, chats
 from app.database import Database
 
 
 
 main_bp = Blueprint('main', __name__)
+
+DEFAULT_RAG_TOP_K = 4  # number of chunks placed in the prompt; override with RAG_TOP_K in the app config
 
 ai_interface: AIProvider
 db_interface: Database
@@ -19,7 +21,15 @@ def on_load(state):
     ai_interface = get_ai_provider(state.app.config)
     db_interface = Database(state.app.config["CONNECTIONSTRING"])
 
-# Flask Tutorial: https://www.geeksforgeeks.org/python/flask-tutorial/
+def answer_with_rag(chat_id: int, user_message: str, chat_history: list[chats]) -> str:
+    """Similarity search over this chat's stored chunks, then ask the model with only the relevant ones."""
+    retrieved = []
+    if db_interface.chat_has_chunks(chat_id):
+        query_embedding = ai_interface.embed_query(user_message)
+        top_k = current_app.config.get("RAG_TOP_K", DEFAULT_RAG_TOP_K)
+        retrieved = db_interface.search_chunks(chat_id, query_embedding, top_k)
+
+    return ai_interface.askQuestion(user_message, retrieved, chat_history)
 
 
 @main_bp.route('/')
@@ -85,18 +95,26 @@ def new_new_chat():
     if not user_message:
         return "message form is needed", 422
 
-    uploaded_files = request.files.getlist("uploaded_files")
-    file_names = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
-    
+    uploaded_files: list[FileStorage] = [f for f in request.files.getlist("uploaded_files") if f and f.filename]
+    file_names = [secure_filename(f.filename) for f in uploaded_files if f.filename]
+
+    # Chunk + embed the uploads first so an unsupported file fails before anything is saved
+    try:
+        chunks = ai_interface.chunk_and_embed(uploaded_files)
+    except ValueError as e:
+        return str(e), 400
+
     chat_name: str = ai_interface.generateNameofChat(user_message)
+    chat_id = db_interface.create_chat(chat_name)
 
-    current_embedings = None
-    if uploaded_files:
-        current_embedings = ai_interface.embed_documents(uploaded_files)
-
-    system_message: str = ai_interface.askQuestion(user_message, current_embedings, [])
-
-    chat_id = db_interface.set_new_chat(chat_name, user_message, system_message, file_names, current_embedings)
+    try:
+        # Chunks must be in the database before we can search them
+        db_interface.add_user_message(chat_id, user_message, file_names, chunks)
+        system_message = answer_with_rag(chat_id, user_message, [])
+        db_interface.add_system_message(chat_id, system_message)
+    except Exception:
+        db_interface.delete_chat(chat_id)
+        raise
 
     return {"chat_id": chat_id,
             "chat_name": chat_name,
@@ -139,18 +157,26 @@ def send_chat(chat_id: int):
     if not user_message:
          return "message form is needed", 422
 
-    uploaded_files: list[FileStorage] = request.files.getlist("uploaded_files")
-    file_names: list[str] = [secure_filename(f.filename) for f in uploaded_files if f and f.filename]
+    uploaded_files: list[FileStorage] = [f for f in request.files.getlist("uploaded_files") if f and f.filename]
+    file_names: list[str] = [secure_filename(f.filename) for f in uploaded_files if f.filename]
 
-    current_chat: list[chats_with_embeddings] = db_interface.get_chat_with_embeddings(chat_id)
+    # Must be read BEFORE saving the new message, otherwise it would appear twice in the prompt
+    current_chat: list[chats] = db_interface.get_chat(chat_id)
+    if not current_chat:
+        return "chat not found", 404
 
-    current_embedings = None
-    if uploaded_files:
-        current_embedings = ai_interface.embed_documents(uploaded_files)
+    try:
+        chunks = ai_interface.chunk_and_embed(uploaded_files)
+    except ValueError as e:
+        return str(e), 400
 
-    system_message: str = ai_interface.askQuestion(user_message, current_embedings, current_chat)
-
-    db_interface.append_to_chat(chat_id, user_message, system_message, file_names, current_embedings)
+    chat_dialog_id = db_interface.add_user_message(chat_id, user_message, file_names, chunks)
+    try:
+        system_message = answer_with_rag(chat_id, user_message, current_chat)
+        db_interface.add_system_message(chat_id, system_message)
+    except Exception:
+        db_interface.delete_dialog_message(chat_dialog_id)  # cascades to this message's chunks
+        raise
 
     return {"message": system_message}
 
