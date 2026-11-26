@@ -17,6 +17,7 @@ The primary objective of this team-based project is to architect, implement, and
 - **Docker**: A single compose.yaml for many services
 - **Cloud Compute**: Google Compute Engine (GCE)
 - **Terraform**: Infrastructure as Code (IaC), Cloud Deployment
+- **Kubernetes**: container orchestration system that automates deploying, scaling, and managing containerized applications.
 - **Security**: Google VPC (with firewall rules), Secret Manager and IAM service accounts
 
 ## File Structure
@@ -157,16 +158,26 @@ erDiagram
     This project is using [UV](https://docs.astral.sh/uv/), it is 10-100 times faster that pip
     It also handles python versions, packages, and virtual environments.
 
-    Linux UV installation
+    Also Docker, Terraform, CloudSDK, Kubernetes is used for deploying to GCP
+
+    Linux installation
 
     ```bash
     curl -LsSf https://astral.sh/uv/install.sh | sh
+    curl -fsSL https://get.docker.com | sudo sh
+    curl https://sdk.cloud.google.com | bash
+    # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+    # https://developer.hashicorp.com/terraform/install
     ```
 
-    Windows UV installation
+    Windows installation
 
     ```bash
     winget install -e --id astral-sh.uv
+    winget install -e --id Docker.DockerDesktop --accept-source-agreements --accept-package-agreements
+    winget install -e --id Google.CloudSDK
+    winget install -e --id Kubernetes.kubectl
+    winget install -e --id Hashicorp.Terraform
     ```
 
    ```bash
@@ -178,6 +189,7 @@ erDiagram
     uv sync # For a production environment without pytest, use uv sync --no-dev
     # run vscode command: "Python: Select Interpreter" and choose the .venv path
     cp .env.example .env # make sure to fill in the .env and don't leak it
+    gcloud init
    ```
 
 2. **Run the Python Flask app**

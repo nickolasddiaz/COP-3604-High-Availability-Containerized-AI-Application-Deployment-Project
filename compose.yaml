@@ -58,7 +58,7 @@ services:
           memory: 1G
   nginx-proxy:
     build: nginx
-    restart: always
+    restart: unless-stopped
     container_name: nginx-proxy
     volumes:
       - ./nginx/default.conf:/tmp/default.conf
